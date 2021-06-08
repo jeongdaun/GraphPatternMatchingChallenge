@@ -9,8 +9,6 @@ Backtrack::Backtrack() {}
 Backtrack::~Backtrack() {}
 
 /*
-graph
-
 Graph::GetGraphID() : graph ID return
 Graph::GetNumVertices() : graph |V| return
 Graph::GetNumEdges() : graph |E| return
@@ -36,103 +34,76 @@ CandidateSet::GetCandidate(Vertex u, size_t i) : u의 candidate set에서 ith ca
 #include <vector>
 
 using namespace std;
-int cnt = 0;
-clock_t start;
+int cnt = 0;                //backtrack 함수 호출 횟수 count
 
-void Check(vector<size_t> list, const Graph &data, const Graph &query, const CandidateSet &cs)
-{
-  for (int i = 0; i < query.GetNumVertices(); i++)
-  {
-    for (int j = i + 1; j < query.GetNumVertices(); j++)
-    {
-      if (query.IsNeighbor(i, j) &&
-          !data.IsNeighbor(list[i], list[j]))
-      {
-        printf("wrong edge! %d %d\n", i, j);
-      }
-      if (list[i] == list[j])
-        printf("same vertex! %d %d\n", list[i], list[j]);
+void backtrack(vector<size_t> &list, vector<bool> &check, size_t id, const Graph &data, const Graph &query, const CandidateSet &cs, size_t level) {
+    for (size_t i = cs.GetCandidateSize(id) - 1; i != -1; i--) {                                            //현재 방문한 노드의 모든 candidate에 대해 수행
+        bool is_fit = true;
+        for (int j = 0; j < list.size(); j++) {
+            if (!check[j])
+                continue;
+            if ((!data.IsNeighbor(list[j], cs.GetCandidate(id, i)) && query.IsNeighbor(id, j))              //선택한 candidate이 올바르게 연결되었는지
+              || cs.GetCandidate(id, i) == list[j]) {                                                       //이미 사용된 candidate은 아닌지 검사
+                is_fit = false;
+                break;
+            }
+        }
+        if (is_fit) {
+            list[id] = cs.GetCandidate(id, i);
+            check[id] = true;
+            if (level == check.size()) {                    //모든 노드를 방문했다면 print out
+                printf("a ");
+                for (int l = 0; l < list.size(); l++)
+                    printf("%d ", list[l]);
+                printf("\n");
+                cnt++;
+                if (cnt == 100000) {
+                    exit(0);
+                }
+                check[id] = false;
+                list[id] = -1;
+                continue;
+            }
+
+            //다음으로 방문할 노드 찾기
+            //cs size가 1인 인접 노드가 있다면 선택
+            //그렇지 않다면 first-fit
+
+            size_t idx = -1;
+            size_t len = query.GetNumVertices();
+            bool flag1 = false, flag2 = false;
+            for (size_t j = 0; j < len; j++) {
+                if (!check[j])
+                    continue;
+                for (size_t k = j + 1; k < len; k++) {
+                    if (check[k])
+                        continue;
+                    if (query.IsNeighbor(j, k)) {
+                        if (!flag2) {
+                            idx = k;
+                            flag2 = true;
+                        }
+                        if (cs.GetCandidateSize(k) == 1) {
+                            idx = k;
+                            flag1 = true;
+                            break;
+                        }
+                    }
+                }
+                if (flag1)
+                    break;
+            }
+            if (idx != -1)
+                backtrack(list, check, idx, data, query, cs, level + 1);
+            check[id] = false;
+            list[id] = -1;
+        }
     }
-  }
 }
 
-void backtrack(vector<size_t> &list, vector<bool> &check, size_t id, const Graph &data, const Graph &query, const CandidateSet &cs, size_t level)
-{
-  if ((double)(clock() - start) / CLOCKS_PER_SEC > 60)
-  {
-    cout << "TIMEOUT " << endl
-         << cnt << endl;
-    exit(0);
-  }
-
-  for (size_t i = 0; i < cs.GetCandidateSize(id); i++)
-  {
-    bool is_fit = true;
-    for (int j = 0; j < list.size(); j++)
-    {
-      if (!check[j])
-        continue;
-      if ((!data.IsNeighbor(list[j], cs.GetCandidate(id, i)) && query.IsNeighbor(id, j)) || cs.GetCandidate(id, i) == list[j])
-      {
-        is_fit = false;
-        break;
-      }
-    }
-    if (is_fit)
-    {
-      list[id] = cs.GetCandidate(id, i);
-      check[id] = true;
-      if (level == check.size())
-      {
-        printf("a ");
-        for (int l = 0; l < list.size(); l++)
-          printf("%d ", list[l]);
-        printf("\n");
-        Check(list, data, query, cs);
-        cnt++;
-        if (cnt == 100000)
-        {
-          cout << (double)(clock() - start) / CLOCKS_PER_SEC << endl;
-          cout << cnt << endl;
-          exit(0);
-        }
-        check[id] = false;
-        list[id] = -1;
-        continue;
-      }
-      size_t idx = -1;
-      size_t min = -1;
-      for (size_t j = 0; j < query.GetNumVertices(); j++)
-      {
-        if (!check[j])
-          continue;
-        for (size_t k = j + 1; k < query.GetNumVertices(); k++)
-        {
-          if (check[k])
-            continue;
-          if (query.IsNeighbor(j, k) && min > cs.GetCandidateSize(k))
-          {
-            idx = k;
-            min = cs.GetCandidateSize(k);
-          }
-        }
-      }
-      if (idx != -1)
-        backtrack(list, check, idx, data, query, cs, level + 1);
-
-      check[id] = false;
-      list[id] = -1;
-    }
-  }
-}
-
-void Backtrack::PrintAllMatches(const Graph &data, const Graph &query, const CandidateSet &cs)
-{
-  start = clock();
-  cout << "t " << query.GetNumVertices() << "\n";
-  vector<size_t> list(query.GetNumVertices(), -1);
-  vector<bool> check(query.GetNumVertices(), false);
-  backtrack(list, check, 0, data, query, cs, 1);
-  cout << (double)(clock() - start) / CLOCKS_PER_SEC << endl;
-  cout << cnt << endl;
+void Backtrack::PrintAllMatches(const Graph &data, const Graph &query, const CandidateSet &cs) {
+    cout << "t " << query.GetNumVertices() << "\n";
+    vector<size_t> list(query.GetNumVertices(), -1);
+    vector<bool> check(query.GetNumVertices(), false);
+    backtrack(list, check, 0, data, query, cs, 1);
 }
